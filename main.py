@@ -1,42 +1,41 @@
 import PyPDF2
-import requests
-import base64
 import os
 from dotenv import load_dotenv
+from elevenlabs.client import ElevenLabs
+from elevenlabs import play, save
 load_dotenv()
-
+# Initializing Eleven Labs
+client = ElevenLabs(api_key=os.getenv("E_API"))
 text = PyPDF2.PdfReader('./three.pdf')
-starting = int(input("What page should I start reading from ? "))
-str_text=""
-def filter_unwanted_text(text):
+starting = int(input("What page should I start reading from ? (e.g First page is zero, and Give an INT) "))
+ending = input("What page should I end reading? (e.g, if to the last page type LAST, or type an int that > starting.)")
+str_text = ""
+
+
+# This is the function to remove unwanted or sentences
+def filter_unwanted_text(text_need_cleaned, sentence=None):
     # Remove specific phrases or patterns
     # This is a simple example; you can use more complex regex if needed
-    text = text.replace("Contents - Prev / Next", "")
-    text = text.replace("Contents - Prev", "")
+    result = text_need_cleaned.replace(sentence, "")
     # You can also add more patterns to remove as needed
-    return text.strip()
+    return result.strip()
 
-while starting < len(text.pages):
-    string=text.pages[starting].extract_text()
+
+if ending == "LAST":
+    page = len(text.pages)
+else:
+    page = int(ending)
+
+while starting < int(ending):
+    string = text.pages[starting].extract_text()
+    string = filter_unwanted_text(string)
     str_text += string
     starting = starting+1
 
-API_BASE_URL = "https://api.sws.speechify.com"
-VOICE_ID = "george"
-header = {
-    "Authorization":'BEARER yx0eX1ozCyT0fdyl-w_tHAVl_A35Ykyo-A37EmEZ-Tc=',
-    "Content-Type":"application/json"
-}
-ssml=f"<speak>{str_text}</speak>"
-payload = {
-    "input": ssml,
-    "voice_id": VOICE_ID,
-    "audio_format": "mp3"
-}
-
-response = requests.post(url=f"{API_BASE_URL}/v1/audio/speech", json=payload,headers=header)
-response.raise_for_status()
-response = response.json()
-decoded_audio_data = base64.b64decode(response['audio_data'])
-with open('output.mp3', 'wb') as audio_file:
-    audio_file.write(decoded_audio_data)
+# This is where the text get played
+audio = client.generate(
+    text=str_text,
+    voice="Rachel"
+)
+play(audio)
+save(audio, "my-file.mp3")
